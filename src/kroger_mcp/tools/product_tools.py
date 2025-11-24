@@ -143,6 +143,7 @@ def register_tools(mcp):
     async def search_products(
         search_term: str,
         location_id: Optional[str] = None,
+        zip_code: Optional[str] = None,
         limit: int = Field(default=10, ge=1, le=50, description="Number of results to return (1-50)"),
         fulfillment: Optional[Literal["csp", "delivery", "pickup"]] = None,
         brand: Optional[str] = None,
@@ -154,6 +155,7 @@ def register_tools(mcp):
         Args:
             search_term: Product search term (e.g., "milk", "bread", "organic apples")
             location_id: Store location ID (uses preferred location if not provided)
+            zip_code: Zip code to search in (if location_id not provided, will look up location for this zip)
             limit: Number of results to return (1-50)
             fulfillment: Filter by fulfillment method (csp=curbside pickup, delivery, pickup)
             brand: Filter by brand name
@@ -161,13 +163,34 @@ def register_tools(mcp):
         Returns:
             Dictionary containing product search results
         """
-        # Use preferred location if none provided
+        # Use provided location_id, or try to get it from preferred location or zip code
         if not location_id:
             location_id = get_preferred_location_id()
+            
+            # If still no location_id, try to get it from zip_code
+            if not location_id and zip_code:
+                if ctx:
+                    await ctx.info(f"Looking up location for zip code {zip_code}")
+                
+                client = get_client_credentials_client()
+                try:
+                    locations = client.location.search_locations(
+                        zip_code=zip_code,
+                        limit=1
+                    )
+                    
+                    if locations and "data" in locations and locations["data"]:
+                        location_id = locations["data"][0].get("locationId")
+                        if ctx:
+                            await ctx.info(f"Found location: {location_id}")
+                except Exception as e:
+                    if ctx:
+                        await ctx.error(f"Failed to look up location for zip code {zip_code}: {str(e)}")
+            
             if not location_id:
                 return {
                     "success": False,
-                    "error": "No location_id provided and no preferred location set. Use set_preferred_location first."
+                    "error": "No location_id provided, no preferred location set, and no valid zip_code provided. Please provide either location_id or zip_code."
                 }
         
         if ctx:

@@ -1,0 +1,1 @@
+https://api-ce.kroger.com/v1/connect/oauth2/authorize?response_type=code&client_id=qpd-bbc9s6gn&redirect_uri=http://localhost:8000/callback&scope=product.compact location.compact

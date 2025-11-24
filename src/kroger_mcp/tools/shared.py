@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 from kroger_api.kroger_api import KrogerAPI
 from kroger_api.utils.env import load_and_validate_env, get_zip_code
 from kroger_api.token_storage import load_token
+from urllib.parse import urlparse
+import pathlib
 
 # Load environment variables
 load_dotenv()
@@ -33,6 +35,24 @@ def get_client_credentials_client() -> KrogerAPI:
     
     try:
         load_and_validate_env(["KROGER_CLIENT_ID", "KROGER_CLIENT_SECRET"])
+
+        # If auth-url.txt exists, use its host as the Kroger API base (certification env)
+        auth_file = pathlib.Path(__file__).parents[3] / "auth-url.txt"
+        if auth_file.exists():
+            try:
+                raw = auth_file.read_text().strip()
+                # extract base URL from the authorize URL
+                parsed = urlparse(raw)
+                base = f"{parsed.scheme}://{parsed.netloc}"
+                # Apply base to KrogerClient if available
+                try:
+                    import kroger_api.client as _kclient
+                    _kclient.KrogerClient.BASE_URL = base
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
         _client_credentials_client = KrogerAPI()
         
         # Try to load existing token first
